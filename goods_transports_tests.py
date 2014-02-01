@@ -1,12 +1,12 @@
 import unittest
 
+
 class TestGOODSConnection(unittest.TestCase):
 
     def setUp(self):
         pass
 
     def test_login(self):
-        
         pass
 
 

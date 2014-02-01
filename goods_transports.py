@@ -1,100 +1,58 @@
 import socket
-import struct
-from datetime import datetime
+from goods_protocol import *
+
 
 class GTransport(object):
+    """I am an abstract GOODS transport base class"""
 
-    def sendData(self, aByteArray):
+    def send_data(self, a_byte_array):
         pass
 
-class GTCPTransport(GTransport):
+    def receive_fully_into(self, a_byte_array):
+        pass
 
-    def __init__(self, host, port):
+
+class GTCPTransport(GTransport):
+    """I am a TCP/IP transport to GOODS"""
+
+    def __init__(self, host='localhost', port=6100):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((host, port))
-        print("Connected to GOODS server.")
 
-    def sendData(self, aByteArray):
-        #print("Sending", type(aByteArray), aByteArray)
-        self.socket.sendall(aByteArray)
+    def send_data(self, a_byte_array):
+        self.socket.sendall(a_byte_array)
 
-    def receiveFullyInto(self, aByteArray):
-        self.socket.recv_into(aByteArray)
-        #print("Reply", aByteArray)
-
+    def receive_fully_into(self, a_byte_array):
+        self.socket.recv_into(a_byte_array)
 
 
 class GConnection(object):
-
-    # Constants
-    BUFFER_SZ = 16
-
-    # Commands
-    INVALID = 4
-    LOGIN = 17
-    OK = 21
-    REFUSED = 22
+    """I am a GOODS database connection API facade"""
 
     @classmethod
-    def defaultTransportClass(cls):
-        "By default connect using TCP transport"
+    def default_transport_class(cls):
+        """By default connect using TCP transport"""
         return GTCPTransport
 
     @classmethod
-    def transportTo(cls, host, port):
-        "Return an instance of the connection transport to the server"
-        return cls.defaultTransportClass()(host, port)
+    def transport_to(cls, host, port):
+        """Return an instance of the connection transport to the server"""
+        return cls.default_transport_class()(host, port)
 
-    @classmethod
-    def defaultSessionName(cls):
-        "Makes up a unique session name"
-        return 'pygoods' + str(datetime.now().microsecond)
+    def __init__(self, host='localhost', port=6100):
+        self.transport = self.__class__.transport_to(host, port)
 
-    def __init__(self, host='localhost', port=6100, sessionName=None):
-        self.transport = self.__class__.transportTo(host, port)
-        self.headerBuf = bytearray(GConnection.BUFFER_SZ)
-        if sessionName:
-            self.sessionName = sessionName
+    def login(self, session_name=None):
+        command = GLoginCommand(self.transport, session_name)
+        if command.run():
+            print("Logged in")
         else:
-            self.sessionName = self.__class__.defaultSessionName()
-        self.login()
+            print("Error:", command.return_code())
 
-    def login(self):
-        self.sendCommandWithLong(self.__class__.LOGIN, len(self.sessionName))
-        self.sendData(self.sessionName)
-        self.receiveOkOrRefused()
-        print("Logged in")
-
-    def sendCommandWithLong(self, command, aLong):
-        self.sendCommand(command, 0, 0, aLong, 0)
-
-    def sendCommand(self, command, aByte, aShort, aLong1, aLong2):
-        "Send all these numbers in network (big-endian) format"
-        struct.pack_into(">bbhll", self.headerBuf, 0,
-                command, aByte, aShort, aLong1, aLong2)    
-        self.sendData(self.headerBuf)
-
-    def sendData(self, aByteArray):
-        self.transport.sendData(aByteArray)
-
-    def receiveOkOrRefused(self):
-        self.receiveHeader()
-        cmd = self.headerCommand()
-        return cmd == self.__class__.OK
-
-    def receiveHeader(self):
-        self.receiveIntoHeaderBuffer()
-        if self.headerCommand() == self.__class__.INVALID:
-            print("Invalid response")
-            self.receiveInvalid()
-            self.receiveHeader()
-
-    def receiveIntoHeaderBuffer(self):
-        self.transport.receiveFullyInto(self.headerBuf)
-
-    def receiveInvalid(self):
-        pass
-
-    def headerCommand(self):
-        return self.headerBuf[0]
+    def logout(self):
+        command = GLogoutCommand(self.transport)
+        if command.run():
+            print("Logged out")
+        else:
+            print("Error:", command.return_code())
 
