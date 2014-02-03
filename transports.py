@@ -1,5 +1,5 @@
 import socket
-from goods_protocol import *
+from protocol import *
 
 
 class GTransport(object):

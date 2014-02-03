@@ -1,4 +1,4 @@
-from goods_transports import GConnection
+from transports import GConnection
 
 
 class GDatabase(object):
